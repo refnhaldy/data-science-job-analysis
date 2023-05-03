@@ -1,19 +1,14 @@
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 import pandas as pd
 import itertools
 import requests
 import gspread
 
+from indodata import *
+from myfunction import *
 from bs4 import BeautifulSoup
 from oauth2client.service_account import ServiceAccountCredentials
-
-# Get Indonesia geographical data from Wikipedia
-url = 'https://id.wikipedia.org/wiki/Daftar_kota_di_Indonesia_menurut_jumlah_penduduk'
-table = pd.read_html(url)[0]
-cities = list(table['Kota'])
-cities = [city.replace('Kota ', '') for city in cities]
-provinces = list(table['Provinsi'].unique())
 
 # Set search terms
 terms = ['Data%20Engineer', 'Data%20Scientist', 'Data%20Analyst']
@@ -36,7 +31,7 @@ for term, province in itertools.product(terms, provinces):
     except (requests.exceptions.HTTPError, ValueError):
         continue
         
-    if jobs is None:
+    if jobs_container is None:
         continue
     
     # Get job information
@@ -58,35 +53,11 @@ df = pd.DataFrame(data, columns=columns)
 # Filter and clean data
 like_cities = '|'.join(cities) + '|Jakarta'
 df = df[df['city'].str.contains(like_cities)]
-df['city'] = df['city'].apply(lambda x: next((c for c in cities if c in x.split()), x))
-
-# Create mapping dictonary
-city_prov = list(table['Provinsi'])
-city_prov_dict = dict(zip(cities, city_prov))
-
-# Define a function to get the province based on the given city
-def get_province(city):
-    """
-    This function takes a city name as input and returns the corresponding province name.
-
-    Args:
-    - city (str): the name of a city
-
-    Returns:
-    - str: the name of the province
-    """
-    if 'Jakarta' in city:
-        return 'Jakarta'
-    elif 'Yogyakarta' in city:
-        return 'Yogyakarta'
-    for key in city_prov_dict.keys():
-        if key in city:
-            return city_prov_dict[key]
-    return city
+df['city'] = df['city'].apply(map_city)
 
 # Create new columns and assign value based on the city column
 df['province'] = df['city'].apply(get_province)
-df['country'] = 'Indonesia' if df['city'].str.contains(like_cities).any() else None
+df['country'] = df['province'].apply(get_country)
 
 # Reorder and filter DataFrame columns
 cols_order = ['job_title', 'company_name', 'city', 'province', 'country', 'date_posted']
@@ -102,12 +73,13 @@ client = gspread.authorize(creds)
 spreadsheet = client.open('jobs_data')
 worksheet = spreadsheet.worksheet('main_data')
 
-# Combine new and existing data, drop duplicates, and update worksheet
+# Combine new and existing data, drop duplicates
 existing_data = worksheet.get_values('2:10000')
 old_df = pd.DataFrame(existing_data, columns=cols_order)
-df = pd.concat([old_df, df], ignore_index=True)
-df = df.drop_duplicates()
+df = pd.concat([old_df, df]).drop_duplicates()
+df = df.sort_values(by='date_posted', ascending=False, ignore_index=True)
 
+# Update data in worksheet
 new_data = [cols_order] + df.values.tolist()
 worksheet.clear()
 worksheet.update(new_data)
