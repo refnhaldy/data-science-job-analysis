@@ -1,4 +1,4 @@
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 import pandas as pd
 import itertools
@@ -20,6 +20,7 @@ data = []
 for term, province in itertools.product(terms, provinces):
     province = province.replace(' ', '%20')
     url = f'https://www.linkedin.com/jobs/search?keywords={term}&location={province}&locationId=&geoId=&f_TPR=&position=1&pageNum=0'
+    # Set headers to get LinkedIn page in Bahasa Indonesia
     headers = {'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7'}
     
     try:
