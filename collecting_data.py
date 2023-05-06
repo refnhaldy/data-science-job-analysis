@@ -1,4 +1,4 @@
-__version__ = "0.2.2"
+__version__ = "1.0.0"
 
 import pandas as pd
 import itertools
@@ -17,7 +17,7 @@ terms = ['Data%20Engineer', 'Data%20Scientist', 'Data%20Analyst']
 data = []
 
 # Loop through all possible combinations of terms and provinces
-for term, province in itertools.product(terms, provinces):
+for term, province in itertools.product(terms, province_list):
     province = province.replace(' ', '%20')
     url = f'https://www.linkedin.com/jobs/search?keywords={term}&location={province}&locationId=&geoId=&f_TPR=&position=1&pageNum=0'
     # Set headers to get LinkedIn page in Bahasa Indonesia
@@ -52,7 +52,7 @@ columns = ['job_title', 'company_name', 'city', 'date_posted']
 df = pd.DataFrame(data, columns=columns)
 
 # Filter and clean data
-like_cities = '|'.join(cities) + '|Jakarta'
+like_cities = '|'.join(city_list) + '|Jakarta'
 df = df[df['city'].str.contains(like_cities)]
 df['city'] = df['city'].apply(map_city)
 
@@ -69,7 +69,7 @@ df = df[df['job_title'].str.contains('Data')]
 scope = ['https://www.googleapis.com/auth/spreadsheets',
          "https://www.googleapis.com/auth/drive.file",
          "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('D:/Projects/data-science-job-analysis/client_sheetsconection.json', scope)
+creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
 client = gspread.authorize(creds)
 spreadsheet = client.open('jobs_data')
 worksheet = spreadsheet.worksheet('main_data')

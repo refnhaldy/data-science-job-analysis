@@ -21,7 +21,7 @@ def map_city(city_name):
     >>> map_city('Bandung, Indonesia')
     'Bandung'
     """
-    for c in cities:
+    for c in city_list:
         if c in city_name:
             return c
     if 'Jakarta' in city_name:
@@ -43,16 +43,16 @@ def get_province(city_name):
 
     >>> get_province('Jakarta Timur')
     'Jakarta'
-    >>> map_city('Tangerang')
+    >>> get_province('Tangerang')
     'Banten'
     """
     if 'Jakarta' in city_name:
         return 'Jakarta'
     elif 'Yogyakarta' in city_name:
         return 'Yogyakarta'
-    for c in cities:
+    for c in city_list:
         if c in city_name:
-            return city_prov_dict[c]
+            return city_province_dict[c]
     return city_name
 
 # A function to get the country based on the given province
@@ -75,7 +75,7 @@ def get_country(province_name):
         return 'Indonesia'
     elif 'Yogyakarta' in province_name:
         return 'Indonesia'
-    for p in provinces:
+    for p in province_list:
         """
         p is checked first to make sure it is exist in the province name
 
