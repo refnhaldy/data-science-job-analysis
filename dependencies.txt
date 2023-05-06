@@ -1,0 +1,6 @@
+pandas
+lxml
+requests
+gspread
+beautifulsoup4
+oauth2client
