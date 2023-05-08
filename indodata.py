@@ -9,11 +9,20 @@ except Exception as e:
     print(f"Error retrieving data from {url}: {e}")
     exit()
 
+# Get city list
 city_list = list(table['Kota'])
 city_list = [city.replace('Kota ', '') for city in city_list]
 
-province_list = list(table['Provinsi'].unique())
-province_list[0] = 'Jakarta'
-province_list[22] = 'Yogyakarta'
+# Get province that in same lenght with cities for dictonary
+province_dict = list(table['Provinsi'])
+for i in range(len(province_dict)):
+    if province_dict[i] == 'Daerah Khusus Ibukota Jakarta':
+        province_dict[i] = 'Jakarta'
+    elif province_dict[i] == 'Daerah Istimewa Yogyakarta':
+        province_dict[i] = 'Yogyakarta'
 
-city_province_dict = dict(zip(city_list, province_list))
+# Get province list
+province_list = list(set(province_dict))
+
+# Create dict for mapping
+city_province_dict = dict(zip(city_list, province_dict))
