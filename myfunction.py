@@ -75,7 +75,7 @@ def get_country(province_name):
         return 'Indonesia'
     elif 'Yogyakarta' in province_name:
         return 'Indonesia'
-    for p in province_list:
+    for p in provinces:
         """
         p is checked first to make sure it is exist in the province name
 

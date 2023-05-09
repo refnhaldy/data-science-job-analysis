@@ -22,7 +22,7 @@ for i in range(len(province_dict)):
         province_dict[i] = 'Yogyakarta'
 
 # Get province list
-province_list = list(set(province_dict))
+provinces = list(set(province_dict))
 
 # Create dict for mapping
 city_province_dict = dict(zip(city_list, province_dict))
