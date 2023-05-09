@@ -141,6 +141,6 @@ combined_df = pd.concat([old_df, df]).drop_duplicates(subset=['job_title', 'comp
 combined_df = combined_df.sort_values(by='date_posted', ascending=False, ignore_index=True)
 
 # Update data in worksheet
-new_data = [cols_order] + df.values.tolist()
+new_data = [cols_order] + combined_df.values.tolist()
 worksheet.clear()
 worksheet.update(new_data)
