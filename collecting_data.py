@@ -8,49 +8,57 @@ from myfunction import *
 from bs4 import BeautifulSoup
 from oauth2client.service_account import ServiceAccountCredentials
 
-# Set search terms
-terms = ['Data Engineer', 'Data Scientist', 'Data Analyst']
-
-def scrape_linkedin(terms, provinces):
+def scrape_linkedin(terms):
     # Initialize variables to store data
     linkedin_data = []
 
     # Loop through all possible combinations of terms and provinces on Linkedin
-    for term, province in itertools.product(terms, provinces):
-        term = term.replace(' ', '%20')
-        province = province.replace(' ', '%20')
-        linkedin_url = f'https://www.linkedin.com/jobs/search?keywords={term}&location={province}&locationId=&geoId=&f_TPR=&position=1&pageNum=0'
+    for term in terms:
+        term = term.replace(' ', '%2B')
+        linkedin_url = f'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={term}&location=Indonesia&geoId=&trk=public_jobs_jobs-search-bar_search-submit&start=0'
         # Set headers to get LinkedIn page in Bahasa Indonesia
         headers = {'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7'}
         
-        try:
-            response = requests.get(linkedin_url, headers=headers)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-            jobs_container = soup.find('ul', 'jobs-search__results-list')
-            jobs = jobs_container.find_all('li')
-        except (requests.exceptions.HTTPError, ValueError):
-            continue
-            
-        if jobs_container is None:
-            continue
-        
-        # Get job information
-        for job in jobs:
-            job_title = job.find('h3', 'base-search-card__title').text.strip()
-            company_name = job.find('h4', 'base-search-card__subtitle').text.strip()
-            city = job.find('span', 'job-search-card__location').text.strip()
-            date_posted = job.find('time', 'job-search-card__listdate')
+        page = 0
 
-            date_posted = date_posted.get('datetime') if date_posted else None
+        while True:
+            try:
+                response = requests.get(linkedin_url, headers=headers)
+                response.raise_for_status()
+                soup = BeautifulSoup(response.text, 'html.parser')
+                jobs = soup.find_all('li')
+            except (requests.exceptions.HTTPError, ValueError):
+                continue
 
-            salary = None
-            description = None
+            # Get job information
+            for job in jobs:
+                job_title = job.find('h3', 'base-search-card__title').text.strip()
+                company_name = job.find('h4', 'base-search-card__subtitle').text.strip()
+                city = job.find('span', 'job-search-card__location').text.strip()
 
-            # Add job information to data list
-            linkedin_data.append([job_title, company_name, city, salary, description, date_posted])
+                date_posted = job.find('time', 'job-search-card__listdate')
+                salary_element = job.find('span', 'job-search-card__salary-info')
 
+                description = None
+
+                via = 'LinkedIn'
+                salary = salary_element.text.strip() if salary_element else None
+                salary = salary.replace('\n            -\n            IDR', ' - ') if salary else None
+                date_posted = date_posted.get('datetime') if date_posted else None
+
+                # Add job information to data list
+                linkedin_data.append([job_title, company_name, city, salary, description, via, date_posted])
+                
+            if len(jobs) < 25:
+                break
+
+            page += 25
+            linkedin_url = f'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={term}&location=Indonesia&geoId=&trk=public_jobs_jobs-search-bar_search-submit&start={page}'
+
+    print('Success get data from Linkedin!')
     return linkedin_data
+
+
 
 def scrape_jobstreet(terms):
     # Initialize variables to store data
@@ -58,7 +66,7 @@ def scrape_jobstreet(terms):
 
     # Loop through all possible combinations of terms and provinces on Jobsteet
     for term in terms:
-        term = term.replace(' ', '-').lower()
+        term = term.replace(' ', '-')
         jobstreet_url = f'https://www.jobstreet.co.id/id/job-search/{term}-jobs/'
         
         page = 1
@@ -76,18 +84,20 @@ def scrape_jobstreet(terms):
             for job in jobs:
                 job_title = job.find('h1').get_text()
                 company_name = job.find('span', 'y44q7i1').get_text()
-                city = job.find('span', 'y44q7i3').get_text()
 
-                salary_element = job.find_all('span', 'y44q7i3')
+                double_element = job.find_all('span', 'y44q7i3')
                 description_element = job.find_all('li')
                 date_element = job.find('time')
                 
-                salary = salary_element[1].text.strip() if len(salary_element) > 1 else None
+                city = double_element[0].get_text()
+                salary = double_element[1].text.strip() if len(double_element) > 1 else None
+                salary = salary.replace('M', '.000.000') if salary else None
                 description = ', '.join(e.text.strip() for e in description_element)
-                date_posted = date_element.get('datetime') if date_element else None
+                via = 'Jobstreet'
+                date_posted = date_element.get('datetime').split('T')[0] if date_element else None
 
                 # Add job information to data list
-                jobstreet_data.append([job_title, company_name, city, salary, description, date_posted])
+                jobstreet_data.append([job_title, company_name, city, salary, description, via, date_posted])
 
             if len(jobs) < 30:
                 break
@@ -95,33 +105,39 @@ def scrape_jobstreet(terms):
             page += 1
             jobstreet_url = f'https://www.jobstreet.co.id/id/job-search/{term}-jobs/{page}/'
 
+    print('Success get data from jobstreet!')
     return jobstreet_data
 
+# Set search terms
+terms = ['data engineer', 'data scientist', 'data analyst']
+
 # Get the data from multiple website and combined the data
-linkedin_data = scrape_linkedin(terms, provinces)
+linkedin_data = scrape_linkedin(terms)
 jobstreet_data = scrape_jobstreet(terms)
 all_data = linkedin_data + jobstreet_data
+print('Success get data from multiple website!')
 
 # Into the dataframe
-columns = ['job_title', 'company_name', 'city', 'monthly_salary', 'description', 'date_posted']
+columns = ['job_title', 'company_name', 'city', 'monthly_salary', 'description', 'via', 'date_posted']
 df = pd.DataFrame(all_data, columns=columns)
 
 # Filter and clean data
 like_cities = '|'.join(city_list) + '|Jakarta'
 df = df[df['city'].str.contains(like_cities)]
 df['city'] = df['city'].apply(map_city)
-# Remove extra info from date_posted
-df['date_posted'] = df['date_posted'].str.split('T').str[0]
 # Remove unwanted characters and extract the desired substring
-df['monthly_salary'] = df['monthly_salary'].str.replace('M', '.000.000')
 df['monthly_salary'] = df['monthly_salary'].str.replace('  per bulan', '')
+df['monthly_salary'] = df['monthly_salary'].str.replace(',00', '')
+df['monthly_salary'] = df['monthly_salary'].str.replace('IDR', '')
+df['monthly_salary'] = df['monthly_salary'].str.replace('.5.0', '.5')
+df['monthly_salary'] = df['monthly_salary'].str.strip()
 
 # Create new columns and assign value based on the city column
 df['province'] = df['city'].apply(get_province)
 df['country'] = df['province'].apply(get_country)
 
 # Reorder and filter DataFrame columns
-cols_order = ['job_title', 'company_name', 'city', 'province', 'country', 'monthly_salary', 'description', 'date_posted']
+cols_order = ['job_title', 'company_name', 'city', 'province', 'country', 'monthly_salary', 'description', 'via', 'date_posted']
 df = df[cols_order]
 df = df[df['job_title'].str.contains('Data')]
 
@@ -144,3 +160,6 @@ combined_df = combined_df.sort_values(by='date_posted', ascending=False, ignore_
 new_data = [cols_order] + combined_df.values.tolist()
 worksheet.clear()
 worksheet.update(new_data)
+
+new_calc_data = len(combined_df) - len(old_df)
+print(f'Success to add {new_calc_data} data to google sheets!')
