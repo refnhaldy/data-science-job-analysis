@@ -29,4 +29,4 @@ jobs:
           pip install -r dependencies.txt
                     
       - name: Execute py script
-        run: python 1_collecting_data.py
+        run: python collecting_data.py
