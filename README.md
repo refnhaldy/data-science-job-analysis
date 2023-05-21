@@ -4,7 +4,7 @@
 <img src="dashboard.png" width=80% height=80%>
 
 <p align="center">
-<a href="https://public.tableau.com/app/profile/refnhaldy.kristian/viz/JobsDashboard_16828593362980/DataJobsInIndonesia">Live Dashboard</a>
+<a href="https://public.tableau.com/app/profile/refnhaldy.kristian/viz/JobsDashboard_16828593362980/DataJobsInIndonesia" target="_blank">Live Dashboard</a>
 
 ## About This Project
 This project is designed specifically to provide users with comprehensive information and resources about data-related job opportunities in Indonesia through dashboard visualization. The project's main objective is to assist job seekers, employers, and data enthusiasts in an efficient and user-friendly manner.
