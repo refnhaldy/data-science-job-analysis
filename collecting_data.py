@@ -49,16 +49,15 @@ def scrape_linkedin(terms):
                 # Add job information to data list
                 linkedin_data.append([job_title, company_name, city, salary, description, via, date_posted])
                 
-            if len(jobs) < 25:
+            # Break the loop if there are less than 25 jobs in the page or the page reaches 975
+            if len(jobs) < 25 or page == 975:
                 break
 
             page += 25
             linkedin_url = f'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={term}&location=Indonesia&geoId=&trk=public_jobs_jobs-search-bar_search-submit&start={page}'
 
-    print('Success get data from Linkedin!')
+    print('Data from LinkedIn has been successfully retrieved!')
     return linkedin_data
-
-
 
 def scrape_jobstreet(terms):
     # Initialize variables to store data
@@ -99,13 +98,14 @@ def scrape_jobstreet(terms):
                 # Add job information to data list
                 jobstreet_data.append([job_title, company_name, city, salary, description, via, date_posted])
 
+            # Break the loop if there are less than 30 jobs in the page
             if len(jobs) < 30:
                 break
 
             page += 1
             jobstreet_url = f'https://www.jobstreet.co.id/id/job-search/{term}-jobs/{page}/'
 
-    print('Success get data from jobstreet!')
+    print('Data from JobStreet has been successfully retrieved!')
     return jobstreet_data
 
 # Set search terms
@@ -115,7 +115,7 @@ terms = ['data engineer', 'data scientist', 'data analyst']
 linkedin_data = scrape_linkedin(terms)
 jobstreet_data = scrape_jobstreet(terms)
 all_data = linkedin_data + jobstreet_data
-print('Success get data from multiple website!')
+print('The data from multiple websites has been succesfully combined!')
 
 # Into the dataframe
 columns = ['job_title', 'company_name', 'city', 'monthly_salary', 'description', 'via', 'date_posted']
@@ -123,43 +123,49 @@ df = pd.DataFrame(all_data, columns=columns)
 
 # Filter and clean data
 like_cities = '|'.join(city_list) + '|Jakarta'
+df = df[df['job_title'].str.contains('Data')]
 df = df[df['city'].str.contains(like_cities)]
 df['city'] = df['city'].apply(map_city)
+print('The data has been succesfully filtered!')
+
 # Remove unwanted characters and extract the desired substring
 df['monthly_salary'] = df['monthly_salary'].str.replace('  per bulan', '')
 df['monthly_salary'] = df['monthly_salary'].str.replace(',00', '')
 df['monthly_salary'] = df['monthly_salary'].str.replace('IDR', '')
 df['monthly_salary'] = df['monthly_salary'].str.replace('.5.0', '.5')
 df['monthly_salary'] = df['monthly_salary'].str.strip()
+print('The data has been succesfully standardized!')
 
 # Create new columns and assign value based on the city column
 df['province'] = df['city'].apply(get_province)
 df['country'] = df['province'].apply(get_country)
+print('Province & Country has been succesfully added to the data!')
 
 # Reorder and filter DataFrame columns
 cols_order = ['job_title', 'company_name', 'city', 'province', 'country', 'monthly_salary', 'description', 'via', 'date_posted']
 df = df[cols_order]
-df = df[df['job_title'].str.contains('Data')]
+print('The data has been succesfully oedered!')
 
 # Connect to Google Sheets API and update worksheet
 scope = ['https://www.googleapis.com/auth/spreadsheets',
          "https://www.googleapis.com/auth/drive.file",
          "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+creds = ServiceAccountCredentials.from_json_keyfile_name('D:/Projects/data-science-job-analysis/credentials.json', scope)
 client = gspread.authorize(creds)
 spreadsheet = client.open('jobs_data')
 worksheet = spreadsheet.worksheet('main_data')
+print('Google worksheets has been succesfully connected!')
 
 # Combine new and existing data, drop duplicates & reorder
 existing_data = worksheet.get_all_values()
 old_df = pd.DataFrame(existing_data[1:], columns=existing_data[0])
 combined_df = pd.concat([old_df, df]).drop_duplicates(subset=['job_title', 'company_name', 'city'])
 combined_df = combined_df.sort_values(by='date_posted', ascending=False, ignore_index=True)
+print('Combined dataframe has been succesfully created!')
 
 # Update data in worksheet
 new_data = [cols_order] + combined_df.values.tolist()
 worksheet.clear()
 worksheet.update(new_data)
-
 new_calc_data = len(combined_df) - len(old_df)
 print(f'Success to add {new_calc_data} data to google sheets!')
