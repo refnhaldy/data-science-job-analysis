@@ -1,5 +1,5 @@
+import os
 import pandas as pd
-import itertools
 import requests
 import gspread
 
@@ -28,7 +28,7 @@ def scrape_linkedin(terms):
                 soup = BeautifulSoup(response.text, 'html.parser')
                 jobs = soup.find_all('li')
             except (requests.exceptions.HTTPError, ValueError):
-                continue
+                break  # Break the loop if there is an error
 
             # Get job information
             for job in jobs:
@@ -56,7 +56,7 @@ def scrape_linkedin(terms):
             page += 25
             linkedin_url = f'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={term}&location=Indonesia&geoId=&trk=public_jobs_jobs-search-bar_search-submit&start={page}'
 
-    print('Data from LinkedIn has been successfully retrieved!')
+    print(len(linkedin_data), 'data from LinkedIn has been successfully retrieved!')
     return linkedin_data
 
 def scrape_jobstreet(terms):
@@ -78,7 +78,7 @@ def scrape_jobstreet(terms):
                 jobs = soup.find_all('article')
 
             except (requests.exceptions.HTTPError, ValueError):
-                continue # Go to the next loop if bad response
+                break # Break the loop if there is an error
             
             for job in jobs:
                 job_title = job.find('h1').get_text()
@@ -105,7 +105,7 @@ def scrape_jobstreet(terms):
             page += 1
             jobstreet_url = f'https://www.jobstreet.co.id/id/job-search/{term}-jobs/{page}/'
 
-    print('Data from JobStreet has been successfully retrieved!')
+    print(len(jobstreet_data), 'data from JobStreet has been successfully retrieved!')
     return jobstreet_data
 
 # Set search terms
@@ -144,13 +144,18 @@ print('Province & Country has been succesfully added to the data!')
 # Reorder and filter DataFrame columns
 cols_order = ['job_title', 'company_name', 'city', 'province', 'country', 'monthly_salary', 'description', 'via', 'date_posted']
 df = df[cols_order]
-print('The data has been succesfully oedered!')
+print('The data has been succesfully reodered!')
 
 # Connect to Google Sheets API and update worksheet
 scope = ['https://www.googleapis.com/auth/spreadsheets',
          "https://www.googleapis.com/auth/drive.file",
          "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('D:/Projects/data-science-job-analysis/credentials.json', scope)
+
+# Get the directory path of credentials.json
+current_dir = os.path.dirname(__file__)
+keyfile_path = current_dir + '\credentials.json'
+creds = ServiceAccountCredentials.from_json_keyfile_name(keyfile_path, scope)
+
 client = gspread.authorize(creds)
 spreadsheet = client.open('jobs_data')
 worksheet = spreadsheet.worksheet('main_data')
