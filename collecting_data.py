@@ -56,7 +56,7 @@ def scrape_linkedin(terms):
             page += 25
             linkedin_url = f'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={term}&location=Indonesia&geoId=&trk=public_jobs_jobs-search-bar_search-submit&start={page}'
 
-    print(len(linkedin_data), 'data from LinkedIn has been successfully retrieved!')
+    print(f'{len(linkedin_data)} data from LinkedIn has been successfully retrieved!')
     return linkedin_data
 
 def scrape_jobstreet(terms):
@@ -105,7 +105,7 @@ def scrape_jobstreet(terms):
             page += 1
             jobstreet_url = f'https://www.jobstreet.co.id/id/job-search/{term}-jobs/{page}/'
 
-    print(len(jobstreet_data), 'data from JobStreet has been successfully retrieved!')
+    print(f'{len(jobstreet_data)} data from JobStreet has been successfully retrieved!')
     return jobstreet_data
 
 # Set search terms
@@ -150,12 +150,9 @@ print('The data has been succesfully reodered!')
 scope = ['https://www.googleapis.com/auth/spreadsheets',
          "https://www.googleapis.com/auth/drive.file",
          "https://www.googleapis.com/auth/drive"]
-
-# Get the directory path of credentials.json
-current_dir = os.path.dirname(__file__)
+current_dir = os.path.dirname(__file__) # Get current directory
 keyfile_path = current_dir + '\credentials.json'
 creds = ServiceAccountCredentials.from_json_keyfile_name(keyfile_path, scope)
-
 client = gspread.authorize(creds)
 spreadsheet = client.open('jobs_data')
 worksheet = spreadsheet.worksheet('main_data')
