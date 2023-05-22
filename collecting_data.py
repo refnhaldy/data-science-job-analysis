@@ -3,8 +3,7 @@ import pandas as pd
 import requests
 import gspread
 
-from indodata import *
-from myfunction import *
+from indogeodata import *
 from bs4 import BeautifulSoup
 from oauth2client.service_account import ServiceAccountCredentials
 
