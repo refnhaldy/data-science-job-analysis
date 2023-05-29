@@ -149,8 +149,7 @@ print('The data has been succesfully reodered!')
 scope = ['https://www.googleapis.com/auth/spreadsheets',
          "https://www.googleapis.com/auth/drive.file",
          "https://www.googleapis.com/auth/drive"]
-current_dir = os.path.dirname(__file__) # Get current directory
-keyfile_path = current_dir + '\credentials.json'
+keyfile_path = os.path.join(os.getcwd(), 'credentials.json')
 creds = ServiceAccountCredentials.from_json_keyfile_name(keyfile_path, scope)
 client = gspread.authorize(creds)
 spreadsheet = client.open('jobs_data')
