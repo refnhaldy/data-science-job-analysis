@@ -132,7 +132,9 @@ df['monthly_salary'] = df['monthly_salary'].str.replace('  per bulan', '')
 df['monthly_salary'] = df['monthly_salary'].str.replace(',00', '')
 df['monthly_salary'] = df['monthly_salary'].str.replace('IDR', '')
 df['monthly_salary'] = df['monthly_salary'].str.replace('.5.0', '.5')
+df['monthly_salary'] = df['monthly_salary'].str.replace('.', '')
 df['monthly_salary'] = df['monthly_salary'].str.strip()
+df[['min_salary', 'max_salary']] = df['monthly_salary'].str.split(' - ', expand=True)
 print('The data has been succesfully standardized!')
 
 # Create new columns and assign value based on the city column
@@ -141,9 +143,10 @@ df['country'] = df['province'].apply(get_country)
 print('Province & Country has been succesfully added to the data!')
 
 # Reorder and filter DataFrame columns
-cols_order = ['job_title', 'company_name', 'city', 'province', 'country', 'monthly_salary', 'description', 'via', 'date_posted']
+cols_order = ['job_title', 'company_name', 'city', 'province', 'country', 'min_salary', 'max_salary', 'description', 'via', 'date_posted']
 df = df[cols_order]
 print('The data has been succesfully reodered!')
+
 
 # Connect to Google Sheets API and update worksheet
 scope = ['https://www.googleapis.com/auth/spreadsheets',
