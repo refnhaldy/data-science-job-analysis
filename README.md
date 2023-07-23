@@ -1,4 +1,4 @@
-# Data Jobs In Indonesia
+# Analysis of Data Jobs in Indonesia
 
 <p align="center">
 <img src="dashboard.png" width=80% height=80%>
