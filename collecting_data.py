@@ -169,6 +169,6 @@ print('Combined dataframe has been succesfully created!')
 # Update data in worksheet
 new_data = [cols_order] + combined_df.values.tolist()
 worksheet.clear()
-worksheet.update(new_data)
+worksheet.update(new_data, raw=True)
 new_calc_data = len(combined_df) - len(old_df)
 print(f'Success to add {new_calc_data} data to google sheets!')
