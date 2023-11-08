@@ -1,10 +1,17 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+Browser data/
 *.py[cod]
 *$py.class
 
 # C extensions
 *.so
+
+# JSON files
+*.json
+
+# CSV files
+*.csv
 
 # Distribution / packaging
 .Python
