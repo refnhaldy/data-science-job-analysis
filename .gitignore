@@ -7,6 +7,9 @@ Browser data/
 # C extensions
 *.so
 
+# Ipynb files
+*.ipynb
+
 # JSON files
 *.json
 
