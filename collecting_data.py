@@ -143,7 +143,7 @@ df['country'] = df['province'].apply(get_country)
 print('Province & Country has been succesfully added to the data!')
 
 # Reorder and filter DataFrame columns
-cols_order = ['job_title', 'company_name', 'city', 'province', 'country', 'min_salary', 'max_salary', 'description', 'via', 'date_posted']
+cols_order = ['date_posted', 'job_title', 'company_name', 'city', 'province', 'min_salary', 'max_salary', 'via', 'description']
 df = df[cols_order]
 print('The data has been succesfully reodered!')
 
@@ -169,6 +169,6 @@ print('Combined dataframe has been succesfully created!')
 # Update data in worksheet
 new_data = [cols_order] + combined_df.values.tolist()
 worksheet.clear()
-worksheet.update(new_data, raw=True)
+worksheet.update(range_name='A1', values=new_data, value_input_option='USER_ENTERED')
 new_calc_data = len(combined_df) - len(old_df)
 print(f'Success to add {new_calc_data} data to google sheets!')

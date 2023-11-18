@@ -177,7 +177,7 @@ def main():
         # Wait for the page to load
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'li')))
         left_pane = driver.find_element(By.CLASS_NAME, 'zxU94d')
-        # load_all_jobs(driver, left_pane)
+        load_all_jobs(driver, left_pane)
         get_jobs(driver, left_pane)
         print(f'The data for {job} has been succesfully collected!')
 
