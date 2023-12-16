@@ -30,5 +30,4 @@ jobs:
                     
       - name: Execute py script
         run: |
-          python collecting_data.py
           python selenium_job_scraping.py
