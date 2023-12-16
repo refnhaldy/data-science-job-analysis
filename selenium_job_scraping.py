@@ -21,6 +21,9 @@ print('The script is running...')
 # Empty list to store job results
 job_results = []
 
+# Default wait time for selenium
+wait_time = 30
+
 # List of job to search
 job_searchs = ['data+analyst', 'data+scientist', 'data+engineer']
 
@@ -95,7 +98,7 @@ def get_jobs(driver, left_pane):
         try:
             # Expand the description
             description_pane.find_element(By.CLASS_NAME, 'mjkhcd').click()
-            WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, 'config-text-expandable')))
+            WebDriverWait(driver, wait_time).until(EC.presence_of_element_located((By.CLASS_NAME, 'config-text-expandable')))
             description = description_pane.find_element(By.CLASS_NAME, 'config-text-expandable').text
         except NoSuchElementException:
             description = description_pane.find_element(By.CLASS_NAME, 'HBvzbc').text
@@ -175,7 +178,7 @@ def main():
         driver.get(f'https://www.google.com/search?q={job}&ibp=htl;jobs#htivrt=jobs&fpstate=tldetail&htilrad=-1.0&htidocid')
 
         # Wait for the page to load
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'li')))
+        WebDriverWait(driver, wait_time).until(EC.presence_of_element_located((By.TAG_NAME, 'li')))
         left_pane = driver.find_element(By.CLASS_NAME, 'zxU94d')
         load_all_jobs(driver, left_pane)
         get_jobs(driver, left_pane)
