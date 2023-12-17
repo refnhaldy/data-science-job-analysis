@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 
 print('The script is running...')
@@ -94,14 +94,7 @@ def get_jobs(driver, left_pane):
 
         # Getting job description from right pane
         description_pane = driver.find_element(By.CLASS_NAME, 'whazf')
-        # Try if description is expandable
-        try:
-            # Expand the description
-            description_pane.find_element(By.CLASS_NAME, 'mjkhcd').click()
-            WebDriverWait(driver, wait_time).until(EC.presence_of_element_located((By.CLASS_NAME, 'config-text-expandable')))
-            description = description_pane.find_element(By.CLASS_NAME, 'config-text-expandable').text
-        except WebDriverException:
-            description = description_pane.find_element(By.CLASS_NAME, 'HBvzbc').text
+        description = description_pane.find_element(By.CLASS_NAME, 'HBvzbc').text
 
         # Append to job_results
         job_results.append([job_title, company_name, location, via, raw_date_posted, salary, job_type, description])
@@ -178,11 +171,14 @@ def main():
         driver.get(f'https://www.google.com/search?q={job}&ibp=htl;jobs#htivrt=jobs&fpstate=tldetail&htilrad=-1.0&htidocid')
 
         # Wait for the page to load
-        WebDriverWait(driver, wait_time).until(EC.presence_of_element_located((By.TAG_NAME, 'li')))
-        left_pane = driver.find_element(By.CLASS_NAME, 'zxU94d')
-        load_all_jobs(driver, left_pane)
-        get_jobs(driver, left_pane)
-        print(f'The data for {job} has been succesfully collected!')
+        try:
+            WebDriverWait(driver, wait_time).until(EC.presence_of_element_located((By.TAG_NAME, 'li')))
+            left_pane = driver.find_element(By.CLASS_NAME, 'zxU94d')
+            load_all_jobs(driver, left_pane)
+            get_jobs(driver, left_pane)
+            print(f'The data for {job} has been succesfully collected!')
+        except TimeoutException:
+            print(f'Cannot find the web element for {job}!')
 
     # Close the browser
     driver.quit()
