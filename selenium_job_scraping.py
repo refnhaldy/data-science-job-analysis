@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.support import expected_conditions as EC
 
 print('The script is running...')
@@ -100,7 +100,7 @@ def get_jobs(driver, left_pane):
             description_pane.find_element(By.CLASS_NAME, 'mjkhcd').click()
             WebDriverWait(driver, wait_time).until(EC.presence_of_element_located((By.CLASS_NAME, 'config-text-expandable')))
             description = description_pane.find_element(By.CLASS_NAME, 'config-text-expandable').text
-        except NoSuchElementException:
+        except WebDriverException:
             description = description_pane.find_element(By.CLASS_NAME, 'HBvzbc').text
 
         # Append to job_results
