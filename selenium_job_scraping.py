@@ -1,195 +1,221 @@
 """Collecting Jobs from Google Job Search"""
 
 __author__ = "Refnhaldy Kristian"
+__version__ = "2.0.0"
 
-# Importing libraries
 import os
 import re
-import pandas as pd
-import gspread
-
-from oauth2client.service_account import ServiceAccountCredentials
 from time import sleep
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+
+import pandas as pd
+import sqlalchemy as db
+from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 
-print('The script is running...')
-# Empty list to store job results
-job_results = []
+def get_state():
+    # Get Indonesia geographical data from Wikipedia
+    url = "https://id.wikipedia.org/wiki/Provinsi_di_Indonesia"
 
-# Default wait time for selenium
-wait_time = 30
+    try:
+        df_city = pd.read_html(url)[2]
+    except Exception as e:
+        print(f"Error retrieving data from {url}: {e}")
+        exit()
+        
+    states = df_city["Provinsi"].values.tolist()
+    states = [state[0] for state in states]
 
-# List of job to search
-job_searchs = ['data+analyst', 'data+scientist', 'data+engineer']
-
-# Pre-defined final data column order
-cols_order = ['date_posted', 'job_title', 'company_name', 'city', 'province', 'min_salary', 'max_salary', 'posted_via', 'job_type', 'description']
+    return states
 
 def setup_selenium():
     user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
 
     # Configure selenium
     options = webdriver.ChromeOptions()
-    options.add_argument(f'user-agent={user_agent}')   # Set user agent
-    options.add_argument('--no-sandbox')    # Disable the sandbox mode
-    options.add_argument("--headless=new")    # Use the new headless mode after version 109
-    options.add_argument('--disable-dev-shm-usage')    # Disable the dev-shm-usage
+    options.add_argument(f"user-agent={user_agent}")   # Set user agent
+    # options.add_argument("--no-sandbox")    # Disable the sandbox mode
+    # options.add_argument("--headless=new")    # Use the new headless mode after version 109
+    # options.add_argument("--disable-dev-shm-usage")    # Disable the dev-shm-usage
     driver = webdriver.Chrome(options=options)
 
     return driver
 
-def load_all_jobs(driver, left_pane):
+def load_page(driver):
     # Scroll to the bottom of the list until all jobs are loaded
     all_jobs_loaded = False
     while not all_jobs_loaded:
 
         # Get old scroll height
-        previous_scroll_height = driver.execute_script("return arguments[0].scrollHeight;", left_pane)
+        old_height = driver.execute_script("return document.body.scrollHeight")
 
         # Scroll to bottom of the list (fetches more jobs)
-        driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", left_pane)
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
-        # Grant some time for messages to load
+        # Grant some time for listing to load
         sleep(1)
 
         # Get current scroll height
-        current_scroll_height = driver.execute_script("return arguments[0].scrollHeight;", left_pane)
-        # Check if all messages were loaded by comparing the scroll heights
-        if current_scroll_height == previous_scroll_height:
+        new_height = driver.execute_script("return document.body.scrollHeight")
+
+        # Check if all list were loaded by comparing the scroll heights
+        if new_height == old_height:
             # Scroll back to top of the list to start collecting jobs
-            driver.execute_script("arguments[0].scrollTop = 0", left_pane)
+            driver.execute_script("window.scrollTo(0, 0);")
             all_jobs_loaded = True
 
-def get_jobs(driver, left_pane):
+def get_listing(driver):
+    list_data = []
+    today = datetime.today()
+
+    # Check wheter class v3jTId is exist in the dom
+    try:
+        driver.find_element(By.CLASS_NAME, "v3jTId")
+        print("No job listing found")
+        return pd.DataFrame()
+    except:
+        pass
+        
     # Looping through jobs list
-    for job in left_pane.find_elements(By.TAG_NAME, 'li'):
-        # Clicking on the job
-        job.click()
+    for job in driver.find_elements(By.CLASS_NAME, "EimVGf"):
+        # Get job details
+        primary: list[str] = job.find_element(By.CLASS_NAME, "u9g6vf").text.split("\n")
+        secondary: list[str] = job.find_element(By.CLASS_NAME, "ApHyTb").text.split("\n")
+        job_title: str = primary[0]
+        company_name: str = primary[1]
+        index_2: list[str] = primary[2].split("•")
+        via: str = index_2[-1].replace("melalui", "")
+        contract: str | None = secondary[-1] if secondary[-1] in ["Kontraktor", "Pekerjaan tetap", "Paruh waktu", "Magang"] else None
 
-        # Getting job details
-        # Extract details information
-        job_title = job.find_element(By.CLASS_NAME, 'BjJfJf').text
-        company_name = job.find_element(By.CLASS_NAME, 'vNEEBe').text
-        location = job.find_element(By.CLASS_NAME, 'Qk80Jf').text
-        # Extract details after via based on the value it contains
-        details = job.find_element(By.CLASS_NAME, 'PwjeAc').text.split('\n')
-        via = ''
-        raw_date_posted = ''
-        salary = ''
-        job_type = ''
-        for i in details:
-            if 'melalui' in i:
-                via = i
-            elif 'yang' in i:
-                raw_date_posted = i
-            elif 'Rp' in i:
-                salary = i
-            else:
-                job_type = i
+        # Initialize variables
+        location: str = ""
+        city: str = ""
+        mapped_city: str = ""
+        salary_range: str = ""
+        posted_at: str = ""
+        date_posted: date | None = None
+        min_monthly_salary: float = 0.00
+        max_monthly_salary: float = 0.00
+        min_daily_salary: float = 0.00
+        max_daily_salary: float = 0.00
+        min_hourly_salary: float = 0.00
+        max_hourly_salary: float = 0.00
 
-        # Getting job description from right pane
-        description_pane = driver.find_element(By.CLASS_NAME, 'whazf')
-        description = description_pane.find_element(By.CLASS_NAME, 'HBvzbc').text
+        # Uncertain index_2 data
+        if len(index_2) > 1:
+            location = index_2[0]
 
-        # Append to job_results
-        job_results.append([job_title, company_name, location, via, raw_date_posted, salary, job_type, description])
+        # Uncertain location data
+        if len(location) > 1:
+            location_list = location.split(",")
+            if len(location_list) > 1:
+                city = location_list[-2]
 
-def convert_salary(text):
-    text = text.replace('Rp ', '').replace('.', '').replace(' rb', '000').replace('per bulan', '')
-    if re.search(r'(\d),(\d{2}) jt', text):
-        text = text.replace(' jt', '0000')
-    elif re.search(r'(\d),(\d) jt', text):
-        text = text.replace(' jt', '00000')
-    else:
-        text = text.replace(' jt', '000000')
+        # Uncertain secondary data
+        if len(secondary) > 2:
+            posted_at = secondary[0]
+            salary_range = secondary[1]
+        elif len(secondary) > 1:
+            if "jt" in secondary[0]:
+                salary_range = secondary[0]
+            elif "hari" in secondary[0] or "jam" in secondary[0]:
+                posted_at = secondary[0]
 
-    return int(text.replace(',', ''))
+        # Handle posted_at
+        if "hari yang lalu" in posted_at:
+            offset = int(posted_at[0])
+            date_posted = (today - timedelta(days=offset)).date()
+        elif "jam yang lalu" in posted_at:
+            offset = int(posted_at[0])
+            date_posted = (today - timedelta(hours=offset)).date()
 
-def prepare_clean_df(job_results):
-    # Create dataframe
-    df = pd.DataFrame(job_results, columns=['job_title', 'company_name', 'location', 'via', 'raw_date_posted', 'salary', 'job_type', 'description'])
-    df = df.drop_duplicates(subset=['job_title', 'company_name', 'location', 'via', 'salary'])
+        # Handle salary_range
+        if "jt per bulan" in salary_range:
+            salary_range = salary_range.replace(",", ".")
+            min_monthly_salary = float(re.findall(r"\d+(?:.\d+)?", salary_range)[0]) * 1_000_000
+            max_monthly_salary = float(re.findall(r"\d+(?:.\d+)?", salary_range)[-1]) * 1_000_000
+            min_daily_salary = min_monthly_salary / 22
+            max_daily_salary = max_monthly_salary / 22
+            min_hourly_salary = min_daily_salary / 8
+            max_hourly_salary = max_daily_salary / 8
+        elif "jt per hari" in salary_range:
+            salary_range = salary_range.replace(",", ".")
+            min_daily_salary = float(re.findall(r"\d+(?:.\d+)?", salary_range)[0]) * 1_000_000
+            max_daily_salary = float(re.findall(r"\d+(?:.\d+)?", salary_range)[-1]) * 1_000_000
+            min_monthly_salary = min_daily_salary * 22
+            max_monthly_salary = max_daily_salary * 22
+            min_hourly_salary = min_daily_salary / 8
+            max_hourly_salary = max_daily_salary / 8
 
-    # Clean and Standardize Data
-    # Convert raw_date_posted to correct dd/mm/yyyy format
-    df['date_posted'] = pd.to_datetime(df['raw_date_posted'].apply(lambda x: datetime.today().date() - timedelta(days=int(x.split(' ')[0])) if 'hari' in x else datetime.today().date() if 'jam' in x else '' if 'bulan' in x else x))
-    # Remove 'melalu' from via column
-    df['posted_via'] = df['via'].str.replace('melalui', '')
-    # Remove '(+n lainnya)' from location column using regex
-    df['location'] = df['location'].apply(lambda x: re.sub(r' \(\+\d+ lainnya\)', '', x))
-    # Get the city from location column
-    df['city'] = df['location'].apply(lambda x: x.split(',')[0] if x != '' else x)
-    df['city'] = df['city'].str.replace('Kota ', '').str.replace('Kab. ', '').str.replace('Kabupaten ', '')
-    # Get the province from location column
-    df['province'] = df['location'].apply(lambda x: x.split(',')[-1].strip() if x != '' else x)
-    # Clean Salary
-    # Drop row if salary contain 'per hari' or 'per tahun'
-    df = df[~df['salary'].str.contains('per hari|per tahun')]
-    # Split salary into min_salary & max_salary
-    df['min_salary'] = df['salary'].apply(lambda x: convert_salary(x.split('–')[0]) if '–' in x else convert_salary(x) if x !='' else x)
-    df['max_salary'] = df['salary'].apply(lambda x: convert_salary(x.split('–')[1]) if '–' in x else convert_salary(x) if x !='' else x)
+        # Handle location
+        if "Kota " in city or "Kabupaten " in city:
+            mapped_city = city.replace("Kota ", "").replace("Kabupaten ", "")
+        else:
+            mapped_city = city
 
-    # Reorder the data
-    df = df[cols_order].sort_values(by=['date_posted'], ascending=False).astype(str).replace('NaT', '')
+        data = {
+            "index_2": index_2,
+            "date_posted": date_posted,
+            "search_category": "",
+            "job_title": job_title.strip(),
+            "company_name": company_name.strip(),
+            "location": location.strip(),
+            "city": city.strip(),
+            "mapped_city": mapped_city.strip(),
+            "via": via.strip(),
+            "contract": contract,
+            "salary_range": salary_range.strip(),
+            "min_monthly_salary": min_monthly_salary,
+            "max_monthly_salary": max_monthly_salary,
+            "min_daily_salary": min_daily_salary,
+            "max_daily_salary": max_daily_salary,
+            "min_hourly_salary": min_hourly_salary,
+            "max_hourly_salary": max_hourly_salary
+        }
+        
+        # Append data to list
+        list_data.append(data)
+    
+    df_listing = pd.DataFrame(list_data)
 
-    return df
-
-def update_worksheet(final_df):
-    # Connect to Google Sheets API and update worksheet
-    scope = ['https://www.googleapis.com/auth/spreadsheets',
-            "https://www.googleapis.com/auth/drive.file",
-            "https://www.googleapis.com/auth/drive"]
-    keyfile_path = os.path.join(os.getcwd(), 'credentials.json')
-    creds = ServiceAccountCredentials.from_json_keyfile_name(keyfile_path, scope)
-    client = gspread.authorize(creds)
-    spreadsheet = client.open('jobs_data')
-    worksheet = spreadsheet.worksheet('selenium_data')
-
-    # Combine new and existing data, drop duplicates & reorder
-    existing_data = worksheet.get_all_values()
-    existing_df = pd.DataFrame(existing_data[1:], columns=existing_data[0])
-    combined_df = pd.concat([existing_df, final_df]).drop_duplicates(subset=['job_title', 'company_name', 'city'])
-    combined_df = combined_df.sort_values(by='date_posted', ascending=False, ignore_index=True)
-
-    # Update data in worksheet
-    new_data = [cols_order] + final_df.values.tolist()
-    worksheet.clear()
-    worksheet.update(range_name='A1', values=new_data, value_input_option='USER_ENTERED')
+    return df_listing
 
 # Main Script
 def main():
-    # Start the script
+    searchs = ["Data+Analyst", "Data+Engineer", "Data+Scientist"]
     driver = setup_selenium()
+    df_final = pd.DataFrame()
 
-    # Loop Through Job Search
-    for job in job_searchs:
-        driver.get(f'https://www.google.com/search?q={job}&ibp=htl;jobs#htivrt=jobs&fpstate=tldetail&htilrad=-1.0&htidocid')
+    for search in searchs:
+        driver.get(f"https://www.google.com/search?q={search}+Indonesia&ibp=htl;jobs#htivrt=jobs&fpstate=tldetail&htilrad=-1.0&htidocid")
 
-        # Wait for the page to load
         try:
-            WebDriverWait(driver, wait_time).until(EC.presence_of_element_located((By.TAG_NAME, 'li')))
-            left_pane = driver.find_element(By.CLASS_NAME, 'zxU94d')
-            load_all_jobs(driver, left_pane)
-            get_jobs(driver, left_pane)
-            print(f'The data for {job} has been succesfully collected!')
+            WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, "EimVGf")))
+            load_page(driver)
+            df_listing = get_listing(driver)
+            df_listing["search_category"] = f"Data {search.split('+')[1]}"
+            df_final = pd.concat([df_final, df_listing], ignore_index=True)
+            print(f"Succesfully get {search} data")
         except TimeoutException:
-            print(f'Cannot find the web element for {job}!')
+            print(f"Request time out while waiting {search} to load")
 
     # Close the browser
     driver.quit()
+    
+    # Set up the database connection
+    load_dotenv()
+    db_user = os.environ.get('DB_USER')
+    db_pass = os.environ.get('DB_PASS')
 
-    print('Preparing the data...')
-    # Prepare the dataframe
-    final_df = prepare_clean_df(job_results)
-    print('Update the data to Google Sheets...')
-    update_worksheet(final_df)
-
-    print('The data has been succesfully updated!')
+    # Create the connection
+    engine = db.create_engine(f'postgresql://{db_user}:{db_pass}@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres')
+    df_final.to_sql("job_listing", engine, if_exists='replace', index=False)
+    
+    print("The data has been succesfully updated!")
 
 if __name__ == "__main__":
     main()
