@@ -38,9 +38,9 @@ def setup_selenium():
     # Configure selenium
     options = webdriver.ChromeOptions()
     options.add_argument(f"user-agent={user_agent}")   # Set user agent
-    # options.add_argument("--no-sandbox")    # Disable the sandbox mode
-    # options.add_argument("--headless=new")    # Use the new headless mode after version 109
-    # options.add_argument("--disable-dev-shm-usage")    # Disable the dev-shm-usage
+    options.add_argument("--no-sandbox")    # Disable the sandbox mode
+    options.add_argument("--headless=new")    # Use the new headless mode after version 109
+    options.add_argument("--disable-dev-shm-usage")    # Disable the dev-shm-usage
     driver = webdriver.Chrome(options=options)
 
     return driver
@@ -159,6 +159,7 @@ def get_listing(driver):
 
         data = {
             "index_2": index_2,
+            "date_collected": today.date(),
             "date_posted": date_posted,
             "search_category": "",
             "job_title": job_title.strip(),
@@ -213,9 +214,19 @@ def main():
 
     # Create the connection
     engine = db.create_engine(f'postgresql://{db_user}:{db_pass}@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres')
-    df_final.to_sql("job_listing", engine, if_exists='replace', index=False)
+
+    # Get previous data from database
+    df_old = pd.read_sql("SELECT job_title, company_name, mapped_city, via FROM public.job_listing", engine)
+
+    # Remove rows from df_final that are already in df_old
+    df_final = pd.merge(df_final, df_old, on=["job_title", "company_name", "mapped_city", "via"], how='left', indicator=True)
+    df_final = df_final[df_final['_merge'] == 'left_only'].drop(columns=['_merge'])
+
+    # Save the data to the database
+    df_final.drop_duplicates(subset=["job_title", "company_name", "mapped_city", "via"], inplace=True)
+    df_final.to_sql("job_listing", engine, if_exists="append", index=False)
     
-    print("The data has been succesfully updated!")
+    print(f"{len(df_final)} data has been succesfully added!")
 
 if __name__ == "__main__":
     main()
