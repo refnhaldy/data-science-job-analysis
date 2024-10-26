@@ -68,7 +68,7 @@ def load_page(driver):
             driver.execute_script("window.scrollTo(0, 0);")
             all_jobs_loaded = True
 
-def get_listing(driver):
+def get_listing(driver: webdriver.Chrome):
     list_data = []
     today = datetime.today()
 
@@ -185,6 +185,31 @@ def get_listing(driver):
 
     return df_listing
 
+def update_data(df_final: pd.DataFrame):
+    # Set up the database connection
+    load_dotenv()
+    DB_USER = os.getenv("DB_USER")
+    DB_PASS = os.getenv("DB_PASS")
+    DB_HOST = os.getenv("DB_HOST")
+    DB_PORT = os.getenv("DB_PORT")
+
+    # Create the connection
+    engine = db.create_engine(f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/postgres")
+
+    # Get previous data from database
+    df_old = pd.read_sql("SELECT job_title, company_name, mapped_city, via FROM public.job_listing", engine)
+
+    # Remove rows from df_final that are already in df_old
+    df_final = pd.merge(df_final, df_old, on=["job_title", "company_name", "mapped_city", "via"], how="left", indicator=True)
+    df_final = df_final[df_final["_merge"] == "left_only"].drop(columns=["_merge"])
+
+    # Save the data to the database
+    df_final.drop_duplicates(subset=["job_title", "company_name", "mapped_city", "via"], inplace=True)
+    df_final.to_sql("job_listing", engine, if_exists="append", index=False)
+    
+    print(f"{len(df_final)} data has been succesfully added!")
+
+
 # Main Script
 def main():
     searchs = ["Data+Analyst", "Data+Engineer", "Data+Scientist"]
@@ -198,7 +223,7 @@ def main():
             WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, "EimVGf")))
             load_page(driver)
             df_listing = get_listing(driver)
-            df_listing["search_category"] = f"Data {search.split('+')[1]}"
+            df_listing["search_category"] = search.replace("+", " ")
             df_final = pd.concat([df_final, df_listing], ignore_index=True)
             print(f"Succesfully get {search} data")
         except TimeoutException:
@@ -207,26 +232,5 @@ def main():
     # Close the browser
     driver.quit()
     
-    # Set up the database connection
-    load_dotenv()
-    db_user = os.environ.get('DB_USER')
-    db_pass = os.environ.get('DB_PASS')
-
-    # Create the connection
-    engine = db.create_engine(f'postgresql://{db_user}:{db_pass}@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres')
-
-    # Get previous data from database
-    df_old = pd.read_sql("SELECT job_title, company_name, mapped_city, via FROM public.job_listing", engine)
-
-    # Remove rows from df_final that are already in df_old
-    df_final = pd.merge(df_final, df_old, on=["job_title", "company_name", "mapped_city", "via"], how='left', indicator=True)
-    df_final = df_final[df_final['_merge'] == 'left_only'].drop(columns=['_merge'])
-
-    # Save the data to the database
-    df_final.drop_duplicates(subset=["job_title", "company_name", "mapped_city", "via"], inplace=True)
-    df_final.to_sql("job_listing", engine, if_exists="append", index=False)
-    
-    print(f"{len(df_final)} data has been succesfully added!")
-
-if __name__ == "__main__":
-    main()
+    # Update the data
+    update_data(df_final)
