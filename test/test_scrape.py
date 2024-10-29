@@ -186,14 +186,11 @@ def get_listing(driver: webdriver.Chrome):
     return df_listing
 
 def update_data(df_final: pd.DataFrame):
-    # Set up the database connection
-    load_dotenv()
-    DB_USER = os.getenv("DB_USER")
-    DB_PASS = os.getenv("DB_PASS")
-    DB_HOST = os.getenv("DB_HOST")
-    DB_PORT = os.getenv("DB_PORT")
+    DB_USER = os.environ.get("DB_USER")
+    DB_PASS = os.environ.get("DB_PASS")
+    DB_HOST = os.environ.get("DB_HOST")
+    DB_PORT = os.environ.get("DB_PORT")
 
-    # Create the connection
     engine = db.create_engine(f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/postgres")
 
     # Get previous data from database
@@ -207,7 +204,7 @@ def update_data(df_final: pd.DataFrame):
     df_final.drop_duplicates(subset=["job_title", "company_name", "mapped_city", "via"], inplace=True)
     df_final.to_sql("job_listing", engine, if_exists="append", index=False)
     
-    print(f"{len(df_final)} data has been succesfully added!")
+    print(f"{len(df_final)} data has been succesfully added to database!")
 
 
 # Main Script
@@ -218,14 +215,15 @@ def main():
 
     for search in searchs:
         driver.get(f"https://www.google.com/search?q={search}+Indonesia&ibp=htl;jobs#htivrt=jobs&fpstate=tldetail&htilrad=-1.0&htidocid")
+        search = search.replace("+", " ")
 
         try:
             WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, "EimVGf")))
             load_page(driver)
             df_listing = get_listing(driver)
-            df_listing["search_category"] = search.replace("+", " ")
+            df_listing["search_category"] = search
             df_final = pd.concat([df_final, df_listing], ignore_index=True)
-            print(f"Succesfully get {search} data")
+            print(f"Succesfully get {len(df_final)} {search} jobs")
         except TimeoutException:
             print(f"Request time out while waiting {search} to load")
 
