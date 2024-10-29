@@ -1,6 +1,6 @@
 # Ignore everything
 *
-__pycache__
+/__pycache__
 
 # Except src directory and requirements.txt file
 !/src
