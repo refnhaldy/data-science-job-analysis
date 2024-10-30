@@ -8,6 +8,7 @@ on:
 jobs:
   run-py-script:
     runs-on: ubuntu-latest
+    environment: Secret Variables
     steps:
           
       - name: Check out repository
@@ -33,6 +34,5 @@ jobs:
           sudo apt-get clean
 
       - name: Execute py script
-        environment: Secret Variables
         run: |
           python src/main.py
