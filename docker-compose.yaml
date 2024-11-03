@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    image: data-jobs-in-indonesia:0.1
+    image: data-jobs-in-indonesia:0.2
     container_name: data-jobs-in-indonesia
     environment:
       - DB_USER=${DB_USER}
