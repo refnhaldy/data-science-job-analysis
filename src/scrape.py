@@ -1,7 +1,7 @@
 """Collecting Jobs from Google Job Search"""
 
 __author__ = "https://github.com/refnhaldykristian"
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 import os
 import re
@@ -10,12 +10,36 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 import sqlalchemy as db
+from sqlalchemy.sql import text
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 
+# Environment Variables
+DB_USER = os.environ.get("DB_USER")
+DB_PASS = os.environ.get("DB_PASS")
+DB_HOST = os.environ.get("DB_HOST")
+DB_PORT = os.environ.get("DB_PORT")
+
+# Global Variables
+today_id = int(datetime.today().strftime("%Y%m%d"))
+engine = db.create_engine(f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/postgres")
+
+def check_etl():
+    # Check if the ETL process already executed for today
+    df = pd.read_sql("SELECT MAX(id) as id FROM public.check_etl", engine)
+    max_id = df["id"].values[0]
+
+    if max_id == today_id:
+        print("ETL process already executed for today")
+        is_executed = True
+    else:
+        is_executed = False
+    
+    return is_executed
+    
 def get_state():
     # Get Indonesia geographical data from Wikipedia
     url = "https://id.wikipedia.org/wiki/Provinsi_di_Indonesia"
@@ -36,10 +60,10 @@ def setup_selenium():
 
     # Configure selenium
     options = webdriver.ChromeOptions()
-    options.add_argument(f"user-agent={user_agent}")   # Set user agent
-    options.add_argument("--no-sandbox")    # Disable the sandbox mode
-    options.add_argument("--headless=new")    # Use the new headless mode after version 109
-    options.add_argument("--disable-dev-shm-usage")    # Disable the dev-shm-usage
+    options.add_argument(f"user-agent={user_agent}")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--headless")
+    options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=options)
 
     return driver
@@ -185,13 +209,6 @@ def get_listing(driver: webdriver.Chrome):
     return df_listing
 
 def update_data(df_final: pd.DataFrame):
-    DB_USER = os.environ.get("DB_USER")
-    DB_PASS = os.environ.get("DB_PASS")
-    DB_HOST = os.environ.get("DB_HOST")
-    DB_PORT = os.environ.get("DB_PORT")
-
-    engine = db.create_engine(f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/postgres")
-
     # Get previous data from database
     df_old = pd.read_sql("SELECT job_title, company_name, mapped_city, via FROM public.job_listing", engine)
 
@@ -205,9 +222,21 @@ def update_data(df_final: pd.DataFrame):
     
     print(f"{len(df_final)} data has been succesfully added to database!")
 
+def update_etl():
+    # Update the check_etl table
+    with engine.connect() as conn:
+        statement = text(f"INSERT INTO public.check_etl (id) VALUES ({today_id})")
+        conn.execute(statement)
+        conn.commit()
 
 # Main Script
 def main():
+    # Check ETL status
+    is_executed = check_etl()
+
+    if is_executed:
+        return
+
     searchs = ["Data+Analyst", "Data+Engineer", "Data+Scientist"]
     driver = setup_selenium()
     df_final = pd.DataFrame()
@@ -231,3 +260,4 @@ def main():
     
     # Update the data
     update_data(df_final)
+    update_etl()
